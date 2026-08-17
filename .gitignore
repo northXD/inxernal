@@ -1,0 +1,29 @@
+# Memory dumps (large, game-owned)
+*.so
+*.pkl
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+package-lock.json
+package.json
+
+# Visual Studio / vcpkg
+.vs/
+x64/
+inxernal/
+vcpkg_installed/
+*.vcxproj
+*.vcxproj.*
+*.slnx
+*.nupkg
+vcpkg.json
+vcpkg-configuration.json
+imgui.ini
+
+# Scratch / notes / exploration
+PROMPT.md
+BENIOKU.txt

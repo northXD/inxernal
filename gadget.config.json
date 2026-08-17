@@ -1,0 +1,10 @@
+{
+  "interaction": {
+    "type": "listen",
+    "address": "127.0.0.1",
+    "port": 31338,
+    "on_load": "resume"
+  },
+  "runtime": "qjs",
+  "teardown": "minimal"
+}
