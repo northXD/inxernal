@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Kaynak Dosyalar">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="�st Bilgi Dosyalar�">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Kaynak Dosyalar�">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Kaynak Dosyalar\imgui">
+      <UniqueIdentifier>{b3079d61-c628-4ea2-9aa3-1609eb6db22e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Kaynak Dosyalar\imgui\backends">
+      <UniqueIdentifier>{f6658efa-da12-40fd-a81f-c65397622405}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="inxernal.cpp">
+      <Filter>Kaynak Dosyalar</Filter>
+    </ClCompile>
+    <ClCompile Include="ui.cpp">
+      <Filter>Kaynak Dosyalar</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\zkutuphaneler\imgui\imgui.cpp">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\zkutuphaneler\imgui\imgui_demo.cpp">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\zkutuphaneler\imgui\imgui_draw.cpp">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\zkutuphaneler\imgui\imgui_tables.cpp">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\zkutuphaneler\imgui\imgui_widgets.cpp">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\zkutuphaneler\imgui\backends\imgui_impl_dx11.cpp">
+      <Filter>Kaynak Dosyalar\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\zkutuphaneler\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>Kaynak Dosyalar\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="engine.cpp">
+      <Filter>Kaynak Dosyalar</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\imconfig.h">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\imgui.h">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\imgui_internal.h">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\imgui_stdlib.h">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\imstb_rectpack.h">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\imstb_textedit.h">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\imstb_truetype.h">
+      <Filter>Kaynak Dosyalar\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\backends\imgui_impl_dx11.h">
+      <Filter>Kaynak Dosyalar\imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zkutuphaneler\imgui\backends\imgui_impl_win32.h">
+      <Filter>Kaynak Dosyalar\imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="engine.h">
+      <Filter>Kaynak Dosyalar</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

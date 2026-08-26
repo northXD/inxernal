@@ -1,94 +1,148 @@
 # inxernal
 
-An **internal tool for Hay Day** (`com.supercell.hayday`) running on **LDPlayer 9** (Android 9, x86_64).
+An **internal bot for Hay Day** (`com.supercell.hayday`) running on **LDPlayer 9** (Android 9,
+x86_64). It injects into the game, survives the **Promon SHIELD** anti‑tamper, calls the game's
+**own** functions (plant / harvest / sell) directly, blocks the **Quago** behavioural anti‑cheat,
+and can spoof the device fingerprint. You drive it from a small `nxrth>` console (or an optional
+Windows GUI).
 
-It injects into the game, survives the Promon SHIELD anti‑tamper protection, and gives you a small
-console from which you can call the game's **own** functions — for example, planting wheat on every
-field with a single command.
+---
 
-## How it works (short version)
+## What you need to run it
 
-The game engine `libg.so` is **ARM64** code, but LDPlayer is x86 and runs it through **Houdini**
-(an ARM→x86 translator). Because of that, normal Frida hooking of the game code doesn't work.
-Instead, inxernal writes its own small pieces of **ARM64 code ("caves")** into the game process and
-redirects the game into them. That lets it call real game functions (like the "plant crop" command)
-exactly the way the game does — so the server accepts the actions.
-
-## Requirements
-
-- **LDPlayer 9** with an **Android 9 (x86_64)** instance, **root + ADB enabled**
-- Hay Day installed and launched at least once
-- **Python 3** with `frida` and `capstone`:
+**On your PC**
+- **Python 3.9+** with Frida:
   ```
-  pip install frida capstone
+  pip install frida
   ```
-- A Frida **server** and Frida **gadget** placed on the device (see Setup)
+  (Optional, only for the reverse‑engineering scripts in `tests/`: `pip install capstone`.)
+- **LDPlayer 9** installed, with its `adb.exe` (the path is auto‑detected).
 
-## Setup
+**In LDPlayer**
+- An **Android 9 (x86_64)** instance, **rooted**, with **ADB enabled**.
+- **Hay Day installed and launched at least once.**
 
-Put your own binaries on the device (their SHA‑256 hashes are checked in `loader.py`, change them to match yours):
+**Binaries staged on the device** (you supply your own — the loader stages the gadget from
+`/data/adb/nxrth-assets/`):
 
 | File | Path on device |
 |------|----------------|
-| Frida server | `/data/adb/nxrth-assets/.service` |
-| Frida gadget | `/data/adb/nxrth-assets/libmetrics.so` |
+| Frida server  | `/data/adb/nxrth-assets/.service` |
+| Frida gadget  | `/data/adb/nxrth-assets/libmetrics.so` |
 
-Keep `hook.js` and `gadget.config.json` in the same folder as `loader.py`.
+The native engine (`native/build/libnxrth.so`) ships pre‑built in the repo; the loader pushes it
+into the game for you. You only need to rebuild it if you change the C++ (see **Building**).
 
-## How to use
+Keep these files next to `loader.py` (they already are): `hook.js`, `gadget.config.json`,
+`java_guard.bundle.js`, `quago_probe.bundle.js`, and the `native/` folder.
 
-1. Start your LDPlayer Android 9 instance.
-2. In the project folder, run:
+---
+
+## Running it
+
+1. Start your LDPlayer Android‑9 instance.
+2. From the project folder:
    ```
    python loader.py
    ```
-3. **WAIT FOR THE GAME TO LOAD.** If the game crashes, type `quit`, run `python loader.py` again,
-   and repeat until the game gets past the loading screen and the `nxrth>` console appears.
-4. Use the commands below.
-
-## Commands
-
-Once the `nxrth>` console is up:
-
-### Farming
-| Command | What it does |
-|---------|--------------|
-| `plant all` | Plant wheat on all fields at once (instant) |
-| `plant all 9` | Plant wheat on the first 9 fields |
-| `plant <fieldId>` | Plant on one field (field IDs are `400000`, `400001`, …) |
-
-### Memory
-| Command | What it does |
-|---------|--------------|
-| `info` | Show libg.so base, size and arch |
-| `read <type> <off> [len]` | Read a value at a libg.so offset |
-| `write <type> <off> <val>` | Write a value |
-| `dump <off> <len>` | Hex dump |
-| `scan "<pattern>"` | Byte‑pattern search |
-
-Types: `int` `float` `double` `long` `ptr` `str` `bytes`.
-
-### Value scanner (like Game Guardian, for heap values)
-| Command | What it does |
-|---------|--------------|
-| `vscan <type> <value>` | First scan |
-| `vnarrow <type> <value>` | Narrow results after the value changes |
-| `vlist` / `vwrite <value>` / `vreset` | List / write / clear results |
-
-### Reverse engineering & low level
-| Command | What it does |
-|---------|--------------|
-| `dumpso <file>` | Dump the unpacked libg.so from memory to a file |
-| `arghook <off>` / `arglog` | Log a function's arguments |
-| `cave` / `farjump` / `wabs` / `rabs` | ARM64 code caves & patching |
+3. **Wait for the game to load.** If it crashes, type `quit`, run `python loader.py` again, and
+   repeat until the game reaches the farm and the `nxrth>` console appears.
+4. Load the native engine, then use the commands:
+   ```
+   nxrth> loadnative        (load the in‑game engine — do this once per session)
+   nxrth> nfields           (list your field ids — you must be on the farm screen)
+   nxrth> nharvest          (harvest every field)
+   nxrth> nplant            (plant wheat on every field)
+   nxrth> nfarm             (auto loop: harvest → plant → wait → repeat, Ctrl+C to stop)
+   ```
 
 Type `quit` to exit.
 
-## Extra tools
+### Main commands (native engine — use these)
 
-- `rev.py` — call‑graph / cross‑reference navigator over a `libg.so` memory dump
-- `analyze_libg.py` — string + cross‑reference scanner over the dump
+| Command | What it does |
+|---|---|
+| `loadnative` | Load the native engine module into the game (once per session) |
+| `nfields` | List the current field ids (they grow each cycle — always read live) |
+| `nplant [crop]` | Plant a crop on every field (default wheat `400001`) |
+| `nharvest` | Harvest every ready field |
+| `nsell <slot> [count] [price] [ad]` | List an item in a roadside‑shop crate (open the shop first) |
+| `nfarm [wait] [crop]` | Auto‑farm loop with human‑like jitter (Ctrl+C to stop) |
+| `nfdiag` | Diagnostic: confirm the field enumeration finds all fields |
 
-## Note
+> You must be **on the farm** for field commands, and **at the roadside shop** for `nsell`.
 
-For educational and reverse‑engineering purposes.
+### Anti‑ban
+
+**Quago (behavioural anti‑cheat) — block its uploads.** Set an environment variable *before*
+starting the loader, then it's automatic:
+```
+PowerShell:   $env:NX_QUAGO = "1"; python loader.py
+```
+| Command | What it does |
+|---|---|
+| `nquago status` | Show block state + how many uploads were blocked |
+| `nquago block on\|off` | Toggle blocking Quago's `api.quago.io` upload |
+| `nstate` | Live game state Quago exposes: current screen, player, farm level, roadside‑shop slots |
+
+**Device fingerprint (optional) — present a Galaxy S24 Ultra.** Opt‑in, off until you turn it on:
+| Command | What it does |
+|---|---|
+| `nspoof scan` | Verify the hook can find the `open` import (no changes made) |
+| `nspoof on` / `nspoof off` | Redirect `/proc/cpuinfo` to a Snapdragon profile and hide root markers |
+| `nspoof` | Show what the hook has intercepted |
+
+Edit the impersonated device in `native/src/device_profile.h` (keep every field consistent).
+
+### Low‑level / reverse‑engineering (advanced)
+
+`info`, `read`/`write`/`dump`/`scan`, the value scanner (`vscan`/`vnarrow`/`vlist`/`vwrite`),
+ARM64 caves (`cave`/`farjump`/`branch`/`wabs`/`rabs`), and dumping (`dumpso`) are all available —
+type them at the `nxrth>` prompt. The `plant`/`harvest`/`farm`/`sell`/`fields` commands are the
+**legacy** Frida‑cave versions; prefer the `n`‑prefixed native ones above.
+
+---
+
+## The GUI (optional)
+
+A Windows ImGui app that drives the loader over a local socket.
+
+1. Build `inxernal.vcxproj` in **Visual Studio** (uses vcpkg for ImGui). This produces the exe.
+2. Run **`python loader.py`** first — it starts a control server on `127.0.0.1:31350`.
+3. Launch the GUI exe. Its buttons (Plant / Harvest / Farm / Sell / Test ADB) send commands to the
+   loader over the socket; a plain console window shows the log.
+
+---
+
+## Building from source
+
+You only need these if you change the corresponding source.
+
+| Part | Command / tool |
+|---|---|
+| Native engine (`native/src/*`) | `powershell native/build.ps1` (needs **Android NDK r27c**) → `native/build/libnxrth.so` |
+| Frida bundles (`java_guard.ts`, `quago_probe.ts`) | `npm install` then `npm run build:java-guard` / `npm run build:quago` (needs **Node.js**) |
+| GUI (`ui.cpp`, `engine.cpp`) | **Visual Studio** + vcpkg (build `inxernal.vcxproj`) |
+
+---
+
+## Project layout
+
+```
+loader.py                 the tool you run (console + control server)
+hook.js                   Frida agent (injection / RPC)
+java_guard.bundle.js      Promon SHIELD suppression (compiled from java_guard.ts)
+quago_probe.bundle.js     Quago block + game‑state feed (compiled from quago_probe.ts)
+gadget*.config.json       Frida gadget configs
+native/                   the in‑game ARM64 engine (src/ + build.ps1 + build/libnxrth.so)
+engine.cpp / engine.h / ui.cpp / inxernal.*   the optional Windows GUI
+tests/                    reverse‑engineering scripts, memory dumps, and experiments (not needed to run)
+```
+
+---
+
+## Notes
+
+- Field ids change every cycle (the game grows object ids) — always read them live with `nfields`.
+- A fresh native build needs a game restart before `loadnative` (a loaded `.so` can't be re‑staged).
+- For educational and reverse‑engineering purposes.

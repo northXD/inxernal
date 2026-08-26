@@ -1,0 +1,9 @@
+{
+  "interaction": {
+    "type": "script",
+    "path": "/data/local/tmp/runtime.js",
+    "on_change": "ignore"
+  },
+  "runtime": "qjs",
+  "teardown": "minimal"
+}

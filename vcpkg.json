@@ -1,0 +1,14 @@
+{
+    "dependencies":  [
+                         {
+                             "name":  "imgui",
+                             "features":  [
+                                              "glfw-binding",
+                                              "opengl3-binding"
+                                          ]
+                         },
+                         "boost-asio",
+                         "nlohmann-json",
+                         "openssl"
+                     ]
+}

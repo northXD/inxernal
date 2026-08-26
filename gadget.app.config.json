@@ -1,0 +1,9 @@
+{
+  "interaction": {
+    "type": "script",
+    "path": "/data/user/0/com.supercell.hayday/files/runtime.js",
+    "on_change": "ignore"
+  },
+  "runtime": "qjs",
+  "teardown": "minimal"
+}

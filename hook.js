@@ -80,17 +80,44 @@ function hasElfMagic(address) {
     }
 }
 
+function isTargetElf(address) {
+    // ELF magic + e_machine == AArch64 (0xB7). libg.so is the game's ARM64 image.
+    try {
+        if (address.readU32() !== ELF_MAGIC) return false;
+        return address.add(0x12).readU16() === 0xB7;
+    } catch (_) {
+        return false;
+    }
+}
+
+function acceptTarget(base) {
+    target.base = base;
+    target.size = TARGET_FILE_SIZE;
+    target.path = "guest:" + TARGET_LIB;
+    target.readySince = Date.now();
+    emit("[ENGINE] " + TARGET_LIB + " guest base " + target.base);
+    return true;
+}
+
 function resolveTarget() {
     if (target.base !== null && hasElfMagic(target.base)) return true;
 
-    if (hasElfMagic(TARGET_GUEST_BASE)) {
-        target.base = TARGET_GUEST_BASE;
-        target.size = TARGET_FILE_SIZE;
-        target.path = "guest:" + TARGET_LIB;
-        target.readySince = Date.now();
-        emit("[ENGINE] " + TARGET_LIB + " guest base " + target.base);
-        return true;
-    }
+    if (isTargetElf(TARGET_GUEST_BASE)) return acceptTarget(TARGET_GUEST_BASE);
+
+    // Fallback: libg.so may map at a different base. Scan guest (r--) ranges
+    // for the largest AArch64 ELF, which is the game engine image.
+    try {
+        var ranges = Process.enumerateRanges("r--");
+        var best = null;
+        for (var i = 0; i < ranges.length; i++) {
+            var r = ranges[i];
+            if (r.size >= 0x1400000 && isTargetElf(r.base) &&
+                (best === null || r.size > best.size)) {
+                best = r;
+            }
+        }
+        if (best !== null) return acceptTarget(best.base);
+    } catch (_) {}
 
     return false;
 }
@@ -293,8 +320,135 @@ function info() {
 installSpawnResumeBarrier();
 emit("[AGENT] Ready | PID=" + Process.id + " Arch=" + Process.arch);
 
+// ---------------------------------------------------------------------------
+//  Native-bridge module loading (aarch64 engine). Loading an ARM ELF into this
+//  x86 Houdini process must go through libnativebridge's NativeBridgeLoadLibrary
+//  Ext(path, flag, NativeBridgeNamespace*). The namespace-aware Ext needs a real
+//  namespace; the legacy simple loader returns null under Houdini. We capture
+//  the app's namespace from an in-flight load (libg.so loads after we attach) -
+//  the same trick the hd-tool injector uses - then reuse it for our module.
+// ---------------------------------------------------------------------------
+var g_nbNs = null;       // captured NativeBridgeNamespace* (app namespace)
+var g_nbNsFrom = null;   // lib path we captured it from
+var g_nbLoads = [];      // recent load paths (diagnostics)
+var g_nbListener = null;
+
+function nbFindExports() {
+    var res = { simple: null, ext: null, vendorNs: null, exportedNs: null, mods: [] };
+    var mods = Process.enumerateModules();
+    for (var mi = 0; mi < mods.length; mi++) {
+        var low = (mods[mi].name || "").toLowerCase();
+        if (low.indexOf("bridge") === -1 && low.indexOf("houdini") === -1 &&
+            low.indexOf("nativeloader") === -1) continue;
+        res.mods.push(mods[mi].name);
+        var exps;
+        try { exps = mods[mi].enumerateExports(); } catch (e) { continue; }
+        for (var i = 0; i < exps.length; i++) {
+            var n = exps[i].name, a = exps[i].address;
+            if (n.indexOf("NativeBridgeLoadLibrary") !== -1) {
+                if (n.indexOf("Ext") !== -1) res.ext = a; else res.simple = a;
+            } else if (n.indexOf("NativeBridgeGetVendorNamespace") !== -1) {
+                res.vendorNs = a;
+            } else if (n.indexOf("NativeBridgeGetExportedNamespace") !== -1) {
+                res.exportedNs = a;
+            }
+        }
+    }
+    return res;
+}
+
+function setupBridgeCapture() {
+    if (g_nbListener) return;
+    var e = nbFindExports();
+    if (!e.ext) return;
+    try {
+        g_nbListener = Interceptor.attach(e.ext, {
+            onEnter: function (args) {
+                var p = "";
+                try { p = args[0].readUtf8String(); } catch (x) {}
+                if (g_nbLoads.length < 64) g_nbLoads.push(p);
+                // Prefer a namespace captured from an app-owned lib load.
+                if (g_nbNs === null && p &&
+                    (p.indexOf("hayday") !== -1 || p.indexOf("/data/") !== -1 ||
+                     p.indexOf("libg.so") !== -1)) {
+                    g_nbNs = args[2];
+                    g_nbNsFrom = p;
+                }
+            }
+        });
+    } catch (e2) {}
+}
+
 rpc.exports = {
     ping: function () { return "pong"; },
+    // Diagnostics for the module loader: what the bridge capture has seen.
+    bridgeinfo: function () {
+        var e = nbFindExports();
+        return {
+            modules: e.mods,
+            hasSimple: !!e.simple, hasExt: !!e.ext,
+            hasVendorNs: !!e.vendorNs, hasExportedNs: !!e.exportedNs,
+            capturedNs: g_nbNs ? g_nbNs.toString() : null,
+            capturedFrom: g_nbNsFrom,
+            loads: g_nbLoads
+        };
+    },
+    // Bootstrap the native aarch64 engine module. The ONLY x86-callable route to
+    // load an ARM ELF is the host native-bridge loader (libnativebridge.so, x86)
+    // -> Houdini, the same path the game uses for libg.so. We call it directly
+    // via a NativeFunction (x86 code, no Java bridge needed). The module resolves
+    // libg via /proc/self/maps, so it is namespace-independent. Its library
+    // constructor runs on load and does the rest.
+    loadmodule: function (path) {
+        var result = { ok: false, via: null, handle: null, nsSource: null,
+                       error: null };
+        var RTLD_NOW = 2;
+        try {
+            var pathPtr = Memory.allocUtf8String(path);
+            var e = nbFindExports();
+            if (!e.ext && !e.simple) {
+                result.error = "no NativeBridgeLoadLibrary export (mods=" +
+                               JSON.stringify(e.mods) + ")";
+                return result;
+            }
+            // 1) namespace-aware Ext with the app namespace we captured from an
+            //    in-flight libg.so load - the reliable path under Houdini.
+            if (e.ext) {
+                var ns = null, nsSource = null;
+                if (g_nbNs) { ns = g_nbNs; nsSource = "captured:" + g_nbNsFrom; }
+                else if (e.vendorNs) {
+                    try { ns = new NativeFunction(e.vendorNs, 'pointer', [])();
+                          nsSource = "vendor"; } catch (x) {}
+                }
+                if (ns) {
+                    var fx = new NativeFunction(e.ext, 'pointer',
+                                                ['pointer', 'int', 'pointer']);
+                    var hx = fx(pathPtr, RTLD_NOW, ns);
+                    result.handle = hx.toString();
+                    result.ok = !hx.isNull();
+                    result.via = "NativeBridgeLoadLibraryExt";
+                    result.nsSource = nsSource;
+                    if (result.ok) return result;
+                }
+            }
+            // 2) fall back to the simple loader (may return null under Houdini).
+            if (e.simple) {
+                var fn = new NativeFunction(e.simple, 'pointer', ['pointer', 'int']);
+                var h = fn(pathPtr, RTLD_NOW);
+                if (!result.handle || result.handle === "0x0") result.handle = h.toString();
+                if (!h.isNull()) {
+                    result.ok = true; result.via = "NativeBridgeLoadLibrary(simple)";
+                    return result;
+                }
+            }
+            if (!result.error) {
+                result.error = "load returned null (nsCaptured=" + (!!g_nbNs) + ")";
+            }
+        } catch (e) {
+            result.error = String(e);
+        }
+        return result;
+    },
     status: function () {
         return {
             pid: Process.id,
@@ -308,6 +462,9 @@ rpc.exports = {
             initialized = true;
             emit("[INIT] Watching for " + TARGET_LIB);
             if (!resolveTarget()) startTargetWatcher();
+            // Start capturing the app's native-bridge namespace now, so it is
+            // ready when libg.so (an app lib) loads shortly after resume.
+            setupBridgeCapture();
         }
         return true;
     },
@@ -384,6 +541,41 @@ rpc.exports = {
         }
         return matches;
     },
+    // Heap-only scan: anonymous rw- ranges under a size cap. Skips file-backed
+    // mappings (libraries incl. Promon's libzyte, and assets) and huge buffers
+    // (graphics/JIT), so it is fast and avoids touching protected regions.
+    scanheap: function (pattern) {
+        var ranges = Process.enumerateRanges("rw-");
+        var matches = [];
+        for (var i = 0; i < ranges.length && matches.length < MAX_SCAN_RESULTS; i++) {
+            var r = ranges[i];
+            if (r.file) continue;
+            if (r.size > 0x10000000) continue;   // skip > 256MB
+            try {
+                var found = Memory.scanSync(r.base, r.size, pattern);
+                for (var j = 0; j < found.length && matches.length < MAX_SCAN_RESULTS; j++) {
+                    matches.push(found[j].address.toString());
+                }
+            } catch (e) {}
+        }
+        return matches;
+    },
+    // Scan ONLY the single mapped range that contains addr. Tiny and scoped to
+    // whatever heap arena the object lives in, so it finds sibling objects
+    // (e.g. all Field objects in the field arena) without touching other
+    // regions -> fast and does not trip Promon like a full scan.
+    scanone: function (addr, pattern) {
+        var matches = [];
+        try {
+            var r = Process.findRangeByAddress(ptr(addr));
+            if (r === null) return matches;
+            var found = Memory.scanSync(r.base, r.size, pattern);
+            for (var j = 0; j < found.length && matches.length < MAX_SCAN_RESULTS; j++) {
+                matches.push(found[j].address.toString());
+            }
+        } catch (e) {}
+        return matches;
+    },
     narrowmem: function (addresses, pattern) {
         var parts = pattern.trim().split(/\s+/);
         var len = parts.length;
@@ -410,6 +602,19 @@ rpc.exports = {
             if (buf === null) return null;
             return Array.prototype.slice.call(new Uint8Array(buf));
         } catch (e) { return null; }
+    },
+    // Batch read: `size` bytes at each address, concatenated into one binary
+    // ArrayBuffer (zero-filled for unreadable addresses). One round-trip for a
+    // whole BFS frontier instead of one RPC per object -> ~30-60x faster walks.
+    readmany: function (addrs, size) {
+        var out = new Uint8Array(addrs.length * size);
+        for (var i = 0; i < addrs.length; i++) {
+            try {
+                var b = ptr(addrs[i]).readByteArray(size);
+                if (b !== null) out.set(new Uint8Array(b), i * size);
+            } catch (e) {}
+        }
+        return out.buffer;
     },
     writeabs: function (addr, byteValues) {
         try {

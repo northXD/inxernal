@@ -1,29 +1,39 @@
-# Memory dumps (large, game-owned)
-*.so
+# --- device assets (never commit) ---
+*.service
+libmetrics.so
+.nxrth-*
+
+# --- copyrighted game binary dumps (RE reference only, not distributed) ---
+tests/libg_dump.so
+tests/libg_ida.so
+libg_*.so
 *.pkl
 
-# Python
+# --- build outputs / dependencies ---
+.vs/
+x64/
+Debug/
+Release/
+vcpkg_installed/
+node_modules/
+*.nupkg
+*.obj
+*.idb
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.user
+imgui.ini
+
+# --- python ---
 __pycache__/
 *.pyc
 
-# Node
-node_modules/
-package-lock.json
-package.json
+# --- claude code local config ---
+.claude/
 
-# Visual Studio / vcpkg
-.vs/
-x64/
-inxernal/
-vcpkg_installed/
-*.vcxproj
-*.vcxproj.*
-*.slnx
-*.nupkg
-vcpkg.json
-vcpkg-configuration.json
-imgui.ini
-
-# Scratch / notes / exploration
+# --- personal notes ---
 PROMPT.md
 BENIOKU.txt
+benioku.txt

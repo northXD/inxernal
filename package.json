@@ -1,0 +1,13 @@
+{
+  "name": "inxernal-frida-agent",
+  "private": true,
+  "scripts": {
+    "build:java-guard": "frida-compile java_guard.ts -o java_guard.bundle.js -B iife",
+    "build:quago": "frida-compile quago_probe.ts -o quago_probe.bundle.js -B iife"
+  },
+  "devDependencies": {
+    "@types/frida-gum": "19.10.0",
+    "frida-compile": "19.0.5",
+    "frida-java-bridge": "7.0.13"
+  }
+}
