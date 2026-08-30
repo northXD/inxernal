@@ -1,6 +1,6 @@
 # inxernal
 
-An **internal bot for Hay Day** (`com.supercell.hayday`) running on **LDPlayer 9** (Android 9,
+An **internal tool for Hay Day** (`com.supercell.hayday`) running on **LDPlayer 9** (Android 9,
 x86_64). It injects into the game, survives the **Promon SHIELD** anti‑tamper, calls the game's
 **own** functions (plant / harvest / sell) directly, blocks the **Quago** behavioural anti‑cheat,
 and can spoof the device fingerprint. You drive it from a small `nxrth>` console (or an optional
