@@ -148,3 +148,4 @@ tests/                    reverse‑engineering scripts, memory dumps, and exper
 - Field ids change every cycle (the game grows object ids) — always read them live with `nfields`.
 - A fresh native build needs a game restart before `loadnative` (a loaded `.so` can't be re‑staged).
 - For educational and reverse‑engineering purposes.
+- Antalya nice hava ama sevgiler sahte
