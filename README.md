@@ -1,3 +1,5 @@
+## IMPORTANT NOTE:
+THIS IS NOT A BOT. ITS JUST A TOOL TO MAKE YOUR OWN INTERNAL. IT HAS NO AUTOMATIONS.
 # inxernal discord.gg/nxrth
 
 An **internal tool for Hay Day** (`com.supercell.hayday`) running on **LDPlayer 9** (Android 9,
